@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Absensi Wajah TKJ</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f1f5f9;
+    color: #1e293b;
+}
+
+header {
+    background: #123c69;
+    color: white;
+    padding: 22px 15px;
+    text-align: center;
+}
+
+header h1 {
+    margin: 0 0 8px;
+    font-size: 23px;
+}
+
+header p {
+    margin: 5px;
+}
+
+.container {
+    max-width: 750px;
+    margin: auto;
+    padding: 15px;
+}
+
+.card {
+    background: white;
+    padding: 18px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    box-shadow: 0 3px 10px #0000000d;
+}
+
+h2 {
+    font-size: 19px;
+    margin-top: 0;
+}
+
+input, select, button {
+    width: 100%;
+    padding: 12px;
+    margin-top: 8px;
+    border-radius: 8px;
+    font-size: 15px;
+}
+
+input, select {
+    border: 1px solid #cbd5e1;
+    background: white;
+}
+
+button {
+    border: none;
+    background: #123c69;
+    color: white;
+    cursor: pointer;
+}
+
+button.secondary {
+    background: #475569;
+}
+
+button.danger {
+    background: #b91c1c;
+}
+
+video {
+    width: 100%;
+    background: #0f172a;
+    border-radius: 10px;
+    margin-top: 10px;
+}
+
+.status {
+    padding: 12px;
+    margin-top: 12px;
+    background: #eff6ff;
+    border-radius: 8px;
+    line-height: 1.5;
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 12px;
+}
+
+th, td {
+    border: 1px solid #cbd5e1;
+    padding: 8px;
+    text-align: left;
+}
+
+th {
+    background: #dbeafe;
+}
+
+footer {
+    text-align: center;
+    color: #64748b;
+    padding: 20px;
+    font-size: 12px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>ABSENSI WAJAH TKJ</h1>
+    <p>SMK Bintang Harapan</p>
+    <p>Uji Coba Sistem Absensi Digital 2027</p>
+</header>
+
+<div class="container">
+
+<section class="card">
+    <h2>📷 Kamera Absensi</h2>
+
+    <p id="cameraStatus">Kamera diaktifkan.</p>
+
+    <video
+    id="camera"
+    autoplay
+    playsinline
+    muted
+    style="width:100%; max-width:640px; background:#0f172a;"
+></video>
+
+<button type="button" onclick="bukaKamera()">
+    📷 Aktifkan Kamera
+</button>
+
+<button type="button" class="secondary" onclick="tutupKamera()">
+    Matikan Kamera
+</button>
+
+<button type="button" class="secondary" onclick="gantiKamera()">
+    🔄 Ganti Kamera Depan/Belakang
+</button>
+
+    <div class="status" id="status">
+        Prototipe siap. Pengenalan wajah otomatis belum diaktifkan.
+    </div>
+</section>
+
+<section class="card">
+    <h2>👨‍🎓 Pendaftaran Siswa</h2>
+
+    <label for="nis">NIS siswa</label>
+    <input id="nis" placeholder="Masukkan NIS">
+
+    <label for="nama">Nama siswa</label>
+    <input id="nama" placeholder="Masukkan nama siswa">
+
+    <label for="kelas">Kelas</label>
+    <select id="kelas">
+        <option value="X TKJ">X TKJ</option>
+    </select>
+
+    <button onclick="daftarSiswa()">Simpan Data Siswa</button>
+
+    <p id="jumlahSiswa">Siswa terdaftar: 0</p>
+</section>
+
+<section class="card">
+    <h2>📝 Absensi Uji Coba</h2>
+
+    <label for="pilihSiswa">Pilih siswa</label>
+    <select id="pilihSiswa">
+        <option value="">-- Pilih siswa --</option>
+    </select>
+
+    <button onclick="catatHadir()">Catat Kehadiran Manual</button>
+
+    <p>
+        Absensi manual hanya untuk pengujian dan penanganan
+        kegagalan pengenalan wajah.
+    </p>
+</section>
+
+<section class="card">
+    <h2>📊 Rekap Kehadiran</h2>
+
+    <p id="jumlahHadir">Siswa hadir: 0</p>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>NIS</th>
+                    <th>Nama</th>
+                    <th>Kelas</th>
+                    <th>Tanggal</th>
+                    <th>Jam</th>
+                    <th>Metode</th>
+                </tr>
+            </thead>
+            <tbody id="rekap"></tbody>
+        </table>
+    </div>
+
+    <button onclick="eksporCSV()">Ekspor Rekap CSV</button>
+    <button class="danger" onclick="hapusRekap()">
+        Hapus Rekap Uji Coba
+    </button>
+</section>
+
+</div>
+
+<footer>
+    Prototipe Absensi TKJ — Data tersimpan pada browser perangkat.
+</footer>
+
+<script>
+const KUNCI_SISWA = "absensi_tkj_siswa_v1";
+const KUNCI_ABSEN = "absensi_tkj_data_v1";
+
+let streamKamera = null;
+
+function bacaData(kunci) {
+    try {
+        return JSON.parse(localStorage.getItem(kunci)) || [];
+    } catch {
+        return [];
+    }
+}
+
+function simpanData(kunci, data) {
+    localStorage.setItem(kunci, JSON.stringify(data));
+}
+
+// FUNGSI MEMBUKA KAMERA
+async function bukaKamera() {
+    const video = document.getElementById("camera");
+    const status = document.getElementById("cameraStatus");
+
+    if (!navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia) {
+        status.textContent =
+            "Kamera tidak didukung di halaman ini. Coba gunakan HTTPS.";
+        return;
+    }
+
+    try {
+        tutupKamera();
+
+        status.textContent = "Meminta izin kamera...";
+
+        streamKamera = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: "user",
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            },
+            audio: false
+        });
+
+        video.srcObject = streamKamera;
+        await video.play();
+
+        status.textContent = "✅ Kamera berhasil diaktifkan!";
+
+    } catch (error) {
+        console.error(error);
+
+        status.textContent = "❌ Kamera gagal dibuka: " + error.message;
+
+        alert(
+            "Kamera gagal dibuka.\n" +
+            "Periksa izin kamera atau gunakan halaman HTTPS."
+        );
+    }
+}
+
+// FUNGSI MEMATIKAN KAMERA
+function tutupKamera() {
+    const video = document.getElementById("camera");
+
+    if (streamKamera) {
+        streamKamera.getTracks().forEach(track => track.stop());
+        streamKamera = null;
+    }
+
+    video.srcObject = null;
+}
+  
+
+function daftarSiswa() {
+    const nis = document.getElementById("nis").value.trim();
+    const nama = document.getElementById("nama").value.trim();
+    const kelas = document.getElementById("kelas").value;
+
+    if (!nis || !nama) {
+        alert("NIS dan nama wajib diisi.");
+        return;
+    }
+
+    const siswa = bacaData(KUNCI_SISWA);
+
+    if (siswa.some(s => s.nis === nis)) {
+        alert("NIS sudah terdaftar.");
+        return;
+    }
+
+    siswa.push({ nis, nama, kelas });
+    simpanData(KUNCI_SISWA, siswa);
+
+    document.getElementById("nis").value = "";
+    document.getElementById("nama").value = "";
+
+    tampilkanSiswa();
+    alert("Data siswa berhasil disimpan.");
+}
+
+function tampilkanSiswa() {
+    const siswa = bacaData(KUNCI_SISWA);
+    const pilihan = document.getElementById("pilihSiswa");
+
+    pilihan.replaceChildren();
+
+    const awal = document.createElement("option");
+    awal.value = "";
+    awal.textContent = "-- Pilih siswa --";
+    pilihan.appendChild(awal);
+
+    siswa.forEach(s => {
+        const opsi = document.createElement("option");
+        opsi.value = s.nis;
+        opsi.textContent = s.nama + " (" + s.nis + ")";
+        pilihan.appendChild(opsi);
+    });
+
+    document.getElementById("jumlahSiswa").textContent =
+        "Siswa terdaftar: " + siswa.length;
+}
+
+function catatHadir() {
+    const nis = document.getElementById("pilihSiswa").value;
+
+    if (!nis) {
+        alert("Pilih siswa terlebih dahulu.");
+        return;
+    }
+
+    const siswa = bacaData(KUNCI_SISWA);
+    const absen = bacaData(KUNCI_ABSEN);
+    const orang = siswa.find(s => s.nis === nis);
+
+    if (!orang) {
+        alert("Data siswa tidak ditemukan.");
+        return;
+    }
+
+    const sekarang = new Date();
+    const tanggal = [
+        sekarang.getFullYear(),
+        String(sekarang.getMonth() + 1).padStart(2, "0"),
+        String(sekarang.getDate()).padStart(2, "0")
+    ].join("-");
+
+    const kunci = tanggal + "_" + nis;
+
+    if (absen.some(a => a.kunci === kunci)) {
+        alert("Siswa sudah tercatat hadir hari ini.");
+        return;
+    }
+
+    absen.push({
+        kunci,
+        nis: orang.nis,
+        nama: orang.nama,
+        kelas: orang.kelas,
+        tanggal,
+        jam: sekarang.toLocaleTimeString("id-ID"),
+        metode: "Manual"
+    });
+
+    simpanData(KUNCI_ABSEN, absen);
+    tampilkanRekap();
+
+    alert("Kehadiran uji coba berhasil dicatat.");
+}
+
+function tampilkanRekap() {
+    const data = bacaData(KUNCI_ABSEN);
+    const tbody = document.getElementById("rekap");
+
+    tbody.replaceChildren();
+
+    data.forEach(a => {
+        const tr = document.createElement("tr");
+
+        [
+            a.nis, a.nama, a.kelas,
+            a.tanggal, a.jam, a.metode
+        ].forEach(nilai => {
+            const td = document.createElement("td");
+            td.textContent = nilai;
+            tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById("jumlahHadir").textContent =
+        "Total catatan kehadiran: " + data.length;
+}
+
+function eksporCSV() {
+    const data = bacaData(KUNCI_ABSEN);
+
+    if (!data.length) {
+        alert("Belum ada data untuk diekspor.");
+        return;
+    }
+
+    const kutip = nilai =>
+        '"' + String(nilai).replace(/"/g, '""') + '"';
+
+    const baris = [
+        ["NIS", "Nama", "Kelas", "Tanggal", "Jam", "Metode"],
+        ...data.map(a => [
+            a.nis, a.nama, a.kelas,
+            a.tanggal, a.jam, a.metode
+        ])
+    ];
+
+    const csv = "\uFEFF" +
+        baris.map(row => row.map(kutip).join(",")).join("\r\n");
+
+    const blob = new Blob([csv], {
+        type: "text/csv;charset=utf-8;"
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "rekap_absensi_tkj.csv";
+    link.click();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function hapusRekap() {
+    if (!confirm("Hapus semua rekap uji coba?")) return;
+
+    simpanData(KUNCI_ABSEN, []);
+    tampilkanRekap();
+}
+
+tampilkanSiswa();
+tampilkanRekap();
+</script>
+
+</body>
+</html>
